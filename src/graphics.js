@@ -1,5 +1,4 @@
 
-const texture = new THREE.TextureLoader().load( 'assets/tarmac.jpg' );
 
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera( 75, window.innerWidth / window.innerHeight, 0.1, 1000 );
@@ -98,7 +97,11 @@ const lanePoints = spline.map(pose => {
 
 const geometry = new THREE.Geometry();
 
-// geometry.faceVertexUvs[0] = [];
+const texture = new THREE.TextureLoader().load( 'assets/tarmac_road.jpg' );
+
+
+const roadMetres = 20
+const metresRoad = 1 / roadMetres
 
 lanePoints.forEach(([l, r], i) => {
     geometry.vertices.push(
@@ -109,59 +112,34 @@ lanePoints.forEach(([l, r], i) => {
         geometry.faces.push( new THREE.Face3( vertex, vertex + 2, vertex + 1 ) );
         geometry.faces.push( new THREE.Face3( vertex + 1, vertex + 2, vertex + 3 ) );
 
-        // geometry.faceVertexUvs[0].push([
-        //     new THREE.Vector2(0,0),        //play with these values
-        //     new THREE.Vector2(0,1),
-        //     new THREE.Vector2(1,0)
-        // ]);
-        // geometry.faceVertexUvs[0].push([
-        //     new THREE.Vector2(1,0),        //play with these values
-        //     new THREE.Vector2(1,1),
-        //     new THREE.Vector2(0,1)
-        // ]);
+        const textureIncrement = (i % roadMetres) / roadMetres;
+
+        geometry.faceVertexUvs[0].push([   // RHS
+            new THREE.Vector2(1, textureIncrement),        
+            new THREE.Vector2(1, textureIncrement + metresRoad),
+            new THREE.Vector2(0, textureIncrement + metresRoad),
+        ]);
+        geometry.faceVertexUvs[0].push([   //LHS
+            new THREE.Vector2(0, textureIncrement),        
+            new THREE.Vector2(1, textureIncrement),
+            new THREE.Vector2(0, textureIncrement + metresRoad),
+        ]);
 
     }
 });
 
 
-// geometry.uvsNeedUpdate = true;
 
-geometry.computeBoundingBox();
-
-var max = geometry.boundingBox.max,
-    min = geometry.boundingBox.min;
-var offset = new THREE.Vector2(0 - min.x, 0 - min.z);
-var range = new THREE.Vector2(max.x - min.x, max.z - min.z);
-const scale = 5;
-range.multiplyScalar(scale);
-var faces = geometry.faces;
-console.log("BBox:", max, min);
-console.log("offset", offset);
-console.log("range", range);
-geometry.faceVertexUvs[0] = [];
-
-for (var i = 0; i < faces.length ; i++) {
-
-    var v1 = geometry.vertices[faces[i].a], 
-        v2 = geometry.vertices[faces[i].b], 
-        v3 = geometry.vertices[faces[i].c];
-
-    geometry.faceVertexUvs[0].push([
-        new THREE.Vector2((v1.x + offset.x)/range.x ,(v1.z + offset.y)/range.y),
-        new THREE.Vector2((v2.x + offset.x)/range.x ,(v2.z + offset.y)/range.y),
-        new THREE.Vector2((v3.x + offset.x)/range.x ,(v3.z + offset.y)/range.y)
-    ]);
-}
 geometry.uvsNeedUpdate = true;
 
 geometry.computeFaceNormals();
 geometry.computeVertexNormals();
 
 texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
-texture.repeat.set( 1024, 1024 );
+texture.repeat.set( 3, 1 );
 
 
-const material = new THREE.MeshBasicMaterial( { color: 0xffffff, map: texture } );
+const material = new THREE.MeshBasicMaterial( { color: 0xaaaaaa, map: texture } );
 
 
 console.log(geometry.faceVertexUvs[0]);
@@ -181,8 +159,10 @@ function startGraphics() {
 
 const height = 2;
 let index = 0;
+let oldIndex = wrap(-1);
 
 function updateCamera() {
+    oldIndex = index;
     index = wrap(index + 1);
     const cameraPose = spline[index];
     const newPosition = cameraPose.position.clone().add(up.clone().multiplyScalar(height));

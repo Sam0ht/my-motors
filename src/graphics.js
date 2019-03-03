@@ -170,6 +170,17 @@ class Car {
         }
     };
 
+    damperForce(wheelIndex) {
+        const totalTravel = this.suspension.totalTravel[wheelIndex] * 0.01;  // cm -> m
+        const displacement = totalTravel - this.pose.position.y;  //TODO: redundant with spring calc
+        if (displacement < 0) {
+            return new THREE.Vector3(0, 0, 0);
+        }
+        const verticalWheelRate = this.velocity.y;  //TODO: big simplification
+        const damperForce = this.suspension.damperRates[wheelIndex] * verticalWheelRate * -2;
+        return this.pose.up.clone().multiplyScalar(damperForce);
+    }
+
     springForce(springIndex) {
         const totalTravel = this.suspension.totalTravel[springIndex] * 0.01;  // cm -> m
         const displacement = totalTravel - this.pose.position.y;  // TODO: consider wheel position based on orientation, intersect ground plane
@@ -189,8 +200,10 @@ class Car {
         
         //front
         force.add(this.springForce(0));
+        force.add(this.damperForce(0));
         //rear        
         force.add(this.springForce(1));
+        force.add(this.damperForce(1));
 
         const acceleration = force.multiplyScalar(this.lightness);
 
@@ -199,6 +212,11 @@ class Car {
         this.velocity = this.velocity.clone().add(dv);
         // console.log("V after", this.velocity);
 
+        // this.lastPose = {
+        //     position: this.pose.position.clone(),
+        //     direction: this.pose.direction.clone(),
+        //     up: this.pose.up.clone()
+        // }
         this.pose.position.add(this.velocity.clone().multiplyScalar(time));
 
     }
@@ -212,7 +230,8 @@ const car = new Car({  // RX-7
     track: 160
 }, {
     wheelRates: [3500, 3500],   //??
-    totalTravel: [20, 20]
+    totalTravel: [20, 20],
+    damperRates: [2000, 2000]
 }, {
     position: new THREE.Vector3(10, 0.5, 0),  //m
     direction: new THREE.Vector3(1, 0, 0),

@@ -150,7 +150,7 @@ const speedUp = 1;
 
 class Car {
 
-    constructor(mass, chassis, suspension, initialPose) {
+    constructor(mass, chassis, suspension, engine, initialPose) {
         this.pose = initialPose;
         this.velocity = new THREE.Vector3(0, 0, 0);
         this.mass = mass;
@@ -158,9 +158,12 @@ class Car {
         this.lightness = 1 / this.mass.mass;
         this.chassisDimensions = chassis;
         this.suspension = suspension;
+        this.engine = engine;
         
         this.cameraHeight = 2;
         this.cameraBehind = 10;
+
+        this.tyreGrip = 1;  // 1G grip
     };
 
     getCameraPose() {
@@ -193,6 +196,13 @@ class Car {
         return totalForce;                    
     }
 
+    tractionForce(throttleInput, wheelLoading) {
+        const appliedTorque = throttleInput * this.engine.maxTorque;
+        const availableTraction = wheelLoading.y * this.tyreGrip;  // TODO: use of wheelLoading.y for vertical load?
+        const driveForce = Math.min(appliedTorque, availableTraction);
+        return this.pose.direction.clone().multiplyScalar(driveForce);        
+    }
+
     update(frameInterval) {
         const time = frameInterval * 0.001 * speedUp;
         const force = new THREE.Vector3(0, 0, 0);
@@ -202,21 +212,23 @@ class Car {
         force.add(this.springForce(0));
         force.add(this.damperForce(0));
         //rear        
-        force.add(this.springForce(1));
-        force.add(this.damperForce(1));
+        const rearSpringForce = this.springForce(1);
+        force.add(rearSpringForce);
+        const rearDamperForce = this.damperForce(1);
+        force.add(rearDamperForce);
+
+        const gamepad = navigator.getGamepads()[0];
+        const throttleInput = gamepad.buttons[7].value;
+        
+        const tractionForce = this.tractionForce(throttleInput, rearSpringForce.clone().add(rearDamperForce));
+        // console.log("Throttle input", throttleInput, "Tractive force", tractionForce);
+        force.add(tractionForce);
 
         const acceleration = force.multiplyScalar(this.lightness);
 
         const dv = acceleration.multiplyScalar(time);
-        // console.log("V", this.velocity, "dV", dv);
         this.velocity = this.velocity.clone().add(dv);
-        // console.log("V after", this.velocity);
 
-        // this.lastPose = {
-        //     position: this.pose.position.clone(),
-        //     direction: this.pose.direction.clone(),
-        //     up: this.pose.up.clone()
-        // }
         this.pose.position.add(this.velocity.clone().multiplyScalar(time));
 
     }
@@ -230,8 +242,10 @@ const car = new Car({  // RX-7
     track: 160
 }, {
     wheelRates: [3500, 3500],   //??
-    totalTravel: [20, 20],
-    damperRates: [2000, 2000]
+    totalTravel: [20, 20],  // cm
+    damperRates: [2000, 2000]  //??
+}, {
+    maxTorque: 800
 }, {
     position: new THREE.Vector3(10, 0.5, 0),  //m
     direction: new THREE.Vector3(1, 0, 0),

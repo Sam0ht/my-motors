@@ -1,18 +1,18 @@
-let gamepad
+// let gamepad
 
-const reportGamepad = () => {
-    reportString = ""
-    gamepad.axes.forEach(axis => {
-        reportString += axis + " ";
-    });
+// const reportGamepad = () => {
+//     reportString = ""
+//     gamepad.axes.forEach(axis => {
+//         reportString += axis + " ";
+//     });
 
-    $("#gamepadValues").text(reportString);
-}
+//     $("#gamepadValues").text(reportString);
+// }
 
 const pickupGamepad = () => {
-    gamepad = navigator.getGamepads()[0]
-    $("#gamepadPrompt").text("Got gamepad with " + gamepad.axes.length + " axes");
-    window.setInterval(reportGamepad, 250);
+    window.gamepad = navigator.getGamepads()[0]
+    $("#gamepadPrompt").text("Got gamepad with " + window.gamepad.axes.length + " axes");    
+    startGraphics();
 }
 
 const initGamepad = () => {
@@ -21,6 +21,7 @@ const initGamepad = () => {
 
     const checkGP = window.setInterval(() => {
         if(navigator.getGamepads()[0]) {
+            console.log("Gamepad available")
             pickupGamepad();
             window.clearInterval(checkGP);
         }

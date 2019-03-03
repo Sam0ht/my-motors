@@ -97,6 +97,8 @@ function createGeometry(lanePoints) {
     return geometry;
 }
 
+const gravity = up.clone().multiplyScalar(-9.8);
+
 function createTrackSpline(up) {
     const sl = 1;
     const straight = (length) => (startPose) => {
@@ -144,12 +146,16 @@ function createTrackSpline(up) {
     return spline;
 }
 
+const speedUp = 1;
+
 class Car {
 
     constructor(mass, chassis, suspension, initialPose) {
         this.pose = initialPose;
         this.velocity = new THREE.Vector3(0, 0, 0);
         this.mass = mass;
+        this.weight = gravity.clone().multiplyScalar(this.mass.mass);
+        this.lightness = 1 / this.mass.mass;
         this.chassisDimensions = chassis;
         this.suspension = suspension;
         
@@ -164,19 +170,51 @@ class Car {
         }
     };
 
-    update() {}
+    springForce(springIndex) {
+        const totalTravel = this.suspension.totalTravel[springIndex] * 0.01;  // cm -> m
+        const displacement = totalTravel - this.pose.position.y;  // TODO: consider wheel position based on orientation, intersect ground plane
+        if (displacement < 0) {
+            return new THREE.Vector3(0, 0, 0);
+        }
+        const springRate = this.suspension.wheelRates[springIndex] * 10;  // kg/cm -> N/m
+        const totalVerticalForce = displacement * springRate * 2;  // two front wheels
+        const totalForce = this.pose.up.clone().multiplyScalar(totalVerticalForce);
+        return totalForce;                    
+    }
+
+    update(frameInterval) {
+        const time = frameInterval * 0.001 * speedUp;
+        const force = new THREE.Vector3(0, 0, 0);
+        force.add(this.weight);
+        
+        //front
+        force.add(this.springForce(0));
+        //rear        
+        force.add(this.springForce(1));
+
+        const acceleration = force.multiplyScalar(this.lightness);
+
+        const dv = acceleration.multiplyScalar(time);
+        // console.log("V", this.velocity, "dV", dv);
+        this.velocity = this.velocity.clone().add(dv);
+        // console.log("V after", this.velocity);
+
+        this.pose.position.add(this.velocity.clone().multiplyScalar(time));
+
+    }
 }
 
 const car = new Car({  // RX-7
-    weight: 1250,
+    mass: 1250,
     cgPosition: [0, 20, 0]  //cm
 }, {
-    wheelbase: 280,
+    wheelbase: 280,   //cm
     track: 160
 }, {
-    wheelRates: [35, 35]
+    wheelRates: [3500, 3500],   //??
+    totalTravel: [20, 20]
 }, {
-    position: new THREE.Vector3(0, 0.2, 0),
+    position: new THREE.Vector3(10, 0.5, 0),  //m
     direction: new THREE.Vector3(1, 0, 0),
     up: up
 });
@@ -199,10 +237,13 @@ function updateCamera() {
     camera.lookAt(newPosition.clone().add(cameraPose.direction))
     camera.updateMatrixWorld();
 }
+const frameInterval = 20;  //ms
+let frameCounter = 0;
 
 function animate() {
-    requestAnimationFrame( animate );
-    car.update();
+    setTimeout( animate , frameInterval);
+    frameCounter++;
+    car.update(frameInterval);
     updateCamera();
 	renderer.render( scene, camera );
 }

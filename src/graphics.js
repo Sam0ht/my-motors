@@ -144,6 +144,43 @@ function createTrackSpline(up) {
     return spline;
 }
 
+class Car {
+
+    constructor(mass, chassis, suspension, initialPose) {
+        this.pose = initialPose;
+        this.velocity = new THREE.Vector3(0, 0, 0);
+        this.mass = mass;
+        this.chassisDimensions = chassis;
+        this.suspension = suspension;
+        
+        this.cameraHeight = 2;
+        this.cameraBehind = 10;
+    };
+
+    getCameraPose() {
+         return {
+            position: this.pose.position.clone().sub(this.pose.direction.clone().multiplyScalar(10)).add(this.pose.up.clone().multiplyScalar(2)),
+            direction: this.pose.direction
+        }
+    };
+
+    update() {}
+}
+
+const car = new Car({  // RX-7
+    weight: 1250,
+    cgPosition: [0, 20, 0]  //cm
+}, {
+    wheelbase: 280,
+    track: 160
+}, {
+    wheelRates: [35, 35]
+}, {
+    position: new THREE.Vector3(0, 0.2, 0),
+    direction: new THREE.Vector3(1, 0, 0),
+    up: up
+});
+
 function startGraphics() {
     document.body.appendChild( renderer.domElement );
     animate();
@@ -154,10 +191,8 @@ let index = 0;
 let oldIndex = wrap(-1);
 
 function updateCamera() {
-    oldIndex = index;
-    index = wrap(index + 1);
-    const cameraPose = spline[index];
-    const newPosition = cameraPose.position.clone().add(up.clone().multiplyScalar(height));
+    const cameraPose = car.getCameraPose();
+    const newPosition = cameraPose.position;
     camera.position.x = newPosition.x
     camera.position.y = newPosition.y
     camera.position.z = newPosition.z
@@ -167,6 +202,7 @@ function updateCamera() {
 
 function animate() {
     requestAnimationFrame( animate );
+    car.update();
     updateCamera();
 	renderer.render( scene, camera );
 }

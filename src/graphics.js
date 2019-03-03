@@ -1,12 +1,8 @@
-
-
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera( 75, window.innerWidth / window.innerHeight, 0.1, 1000 );
 
 const renderer = new THREE.WebGLRenderer();
 renderer.setSize( window.innerWidth, window.innerHeight );
-
-
 
 const up = new THREE.Vector3(0, 1, 0);
 let spline = createTrackSpline(up);
@@ -32,39 +28,26 @@ spline = spline.map((pose, i) => {
 
 window.spline = spline;
 
+
 const lane = { width: 6, offset: 0, id: 0 };
-
-
 const lanePoints = makeLane(lane, spline);
-
-
 const geometry = createGeometry(lanePoints);
-
 const trackObject = createMesh(geometry, 'assets/tarmac_road.jpg');
-
 scene.add( trackObject );
 
 const laneGrass = {width: 5, offset: 5.5, id: 1 };
 const lanePointsGrass = makeLane(laneGrass, spline);
 const geometryGrass = createGeometry(lanePointsGrass);
-
 const grassObject = createMesh(geometryGrass, 'assets/grass.jpg');
-
 scene.add( grassObject );
 
 
 const laneGrass2 = {width: 5, offset: -5.5, id: 1 };
 const lanePointsGrass2 = makeLane(laneGrass2, spline);
 const geometryGrass2 = createGeometry(lanePointsGrass2);
-
 const grassObject2 = createMesh(geometryGrass2, 'assets/grass.jpg');
-
 scene.add( grassObject2 );
 
-
-camera.position.y = 200;
-camera.lookAt(new THREE.Vector3(0, 0, 0))
-camera.updateMatrixWorld();
 
 function makeLane(lane, spline) {
     const leftOffset = -(lane.width * 0.5) + lane.offset;

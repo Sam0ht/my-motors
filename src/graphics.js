@@ -203,26 +203,44 @@ class Car {
         return this.pose.direction.clone().multiplyScalar(driveForce);        
     }
 
+    brakingForce(brakeInput, wheelLoading) {
+        // TODO: direction depends on velocity = -ve if direction matches vel, +ve otherwise.
+        const appliedTorque = brakeInput * this.engine.maxBrakeTorque;
+        const availableTraction = wheelLoading.y * this.tyreGrip;  // TODO: use of wheelLoading.y for vertical load?
+        const brakeForce = Math.min(appliedTorque, availableTraction);
+        return this.pose.direction.clone().multiplyScalar(-brakeForce);     
+    }
+
     update(frameInterval) {
         const time = frameInterval * 0.001 * speedUp;
         const force = new THREE.Vector3(0, 0, 0);
         force.add(this.weight);
         
         //front
-        force.add(this.springForce(0));
-        force.add(this.damperForce(0));
+        const frontSpringForce = this.springForce(0);
+        const frontDampingForce = this.damperForce(0);
+        const frontWheelLoading = frontSpringForce.clone().add(frontDampingForce);
+        force.add(frontWheelLoading);
+
         //rear        
-        const rearSpringForce = this.springForce(1);
-        force.add(rearSpringForce);
+        const rearSpringForce = this.springForce(1);        
         const rearDamperForce = this.damperForce(1);
-        force.add(rearDamperForce);
+        const rearWheelLoading = rearSpringForce.clone().add(rearDamperForce);
+        force.add(rearWheelLoading);
 
         const gamepad = navigator.getGamepads()[0];
         const throttleInput = gamepad.buttons[7].value;
         
-        const tractionForce = this.tractionForce(throttleInput, rearSpringForce.clone().add(rearDamperForce));
+        const tractionForce = this.tractionForce(throttleInput, rearWheelLoading);
         // console.log("Throttle input", throttleInput, "Tractive force", tractionForce);
         force.add(tractionForce);
+
+        const brakeInput = gamepad.buttons[6].value;
+
+        const brakingForceFront = this.brakingForce(brakeInput, frontWheelLoading);
+        force.add(brakingForceFront);
+        const brakingForceRear = this.brakingForce(brakeInput, rearWheelLoading);
+        force.add(brakingForceRear);
 
         const acceleration = force.multiplyScalar(this.lightness);
 
@@ -245,7 +263,8 @@ const car = new Car({  // RX-7
     totalTravel: [20, 20],  // cm
     damperRates: [2000, 2000]  //??
 }, {
-    maxTorque: 800
+    maxTorque: 800,
+    maxBrakeTorque: 1000
 }, {
     position: new THREE.Vector3(10, 0.5, 0),  //m
     direction: new THREE.Vector3(1, 0, 0),

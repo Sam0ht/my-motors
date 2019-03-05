@@ -168,12 +168,12 @@ class Car {
         this.yawRate = 0;
 
         this.tyreGrip = 1;  // 1G grip
-        this.tyreSharpness = 1000;  // N / radian / m/s  (?)
+        this.tyreSharpness = 2000;  // N / radian / m/s  (?)
     };
 
     getCameraPose() {
          return {
-            position: this.pose.position.clone().sub(this.pose.direction.clone().multiplyScalar(10)).add(this.pose.up.clone().multiplyScalar(2)),
+            position: this.pose.position.clone().sub(this.pose.direction.clone().multiplyScalar(this.cameraBehind)).add(this.pose.up.clone().multiplyScalar(this.cameraHeight)),
             direction: this.pose.direction
         }
     };
@@ -225,7 +225,7 @@ class Car {
         const slipForce = slipAngle * speed * this.tyreSharpness;
         const availableTraction = wheelLoading.y * this.tyreGrip;  // TODO: use of wheelLoading.y for vertical load?
         const lateralForce = Math.min(slipForce, availableTraction);
-        return this.rightVector().multiplyScalar(-lateralForce);     
+        return [this.rightVector().multiplyScalar(-lateralForce), slipForce > availableTraction];     
     }
 
     angleFrom(v1, v2) {
@@ -233,6 +233,12 @@ class Car {
         const cross = v1.clone().cross(v2);
         const polarity = Math.sign(this.pose.up.clone().dot(cross));
         return angle * polarity;  // angleTo is absolute, doesn't include direction (sigh)
+    }
+
+    controlCurve(steeringInput) {
+        const absIn = Math.abs(steeringInput);
+        const positiveInput = absIn * 0.5 + Math.max(0, absIn - 0.5)
+        return positiveInput * Math.sign(steeringInput);
     }
 
     update(frameInterval) {
@@ -268,7 +274,7 @@ class Car {
         force.add(brakingForceRear);
 
         // lateral forces
-        if (this.velocity.length() > 0) {
+        // if (this.velocity.length() > 0) {
             const spinVelocityFront = -this.frontWheelbase * this.yawRate;
             const frontWheelVelocity = this.velocity.clone().add(this.rightVector().multiplyScalar(spinVelocityFront));
 
@@ -283,28 +289,28 @@ class Car {
             const rearWheelVelocity = this.velocity.clone().add(this.rightVector().multiplyScalar(spinVelocityRear));
             const slipAngleRear = this.angleFrom(rearWheelVelocity, this.pose.direction);
 
-            const lateralForceRear = this.lateralForce(slipAngleRear, rearWheelVelocity.length(), rearWheelLoading);
+            const [lateralForceRear, slideRear] = this.lateralForce(slipAngleRear, rearWheelVelocity.length(), rearWheelLoading);
             force.add(lateralForceRear)
             // console.log("slip angles", slipAngleFront, slipAngleRear, "rear lat force", lateralForceRear);
 
             // front wheels
-            const steeringInput = gamepad.axes[2] ** 3;
+            const steeringInput = this.controlCurve(gamepad.axes[2]);
             const steeringAngle = -(steeringInput) * this.maxSteeringLockRadians;  // cube to make -1..1 range input softer around centre
-            const lateralForceFront = this.lateralForce(slipAngleFront + steeringAngle, frontWheelVelocity.length(), frontWheelLoading);
+            const [lateralForceFront, slideFront] = this.lateralForce(slipAngleFront + steeringAngle, frontWheelVelocity.length(), frontWheelLoading);
             force.add(lateralForceFront);
 
             // console.log("input", steeringInput, "angle", steeringAngle, "lat force front", lateralForceFront);
             
             // Yaw Torque
             const right = this.rightVector();
-            const yawTorque = (lateralForceRear.dot(right) * this.rearWheelbase * 1.1) - lateralForceFront.dot(right) * this.frontWheelbase;          // 1.1 for stability
+            const yawTorque = (lateralForceRear.dot(right) * this.rearWheelbase) - lateralForceFront.dot(right) * this.frontWheelbase;          // 1.1 for stability
             this.yawRate += (time * 0.2 * yawTorque / this.mass.inertia);  // 0.2 to slow down rotation wrt lateral grip
             const yaw = this.yawRate * time;
             this.pose.direction.applyAxisAngle(this.pose.up, yaw);
             // console.log("yaw torque", yawTorque, "yaw rate", this.yawRate, "yaw", yaw, "direction", this.pose.direction);
-        } else {
-            console.log("start driving to develop lateral forces", this.velocity)
-        }
+        // } else {
+        //     console.log("start driving to develop lateral forces", this.velocity)
+        // }
 
         const acceleration = force.multiplyScalar(this.lightness);
 
@@ -312,6 +318,12 @@ class Car {
         this.velocity = this.velocity.clone().add(dv);
 
         this.pose.position.add(this.velocity.clone().multiplyScalar(time));
+
+        if (frameCounter % 5 == 0) {
+            if (slideFront || slideRear) {
+                console.log("Speed", this.velocity.length(), "Slide front", slideFront, "Slide rear", slideRear);
+            }
+        }
 
     }
 }

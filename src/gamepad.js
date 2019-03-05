@@ -12,13 +12,13 @@
 const pickupGamepad = () => {
     window.gamepad = navigator.getGamepads()[0]
     // $("#gamepadPrompt").text("Got gamepad with " + window.gamepad.axes.length + " axes");    
-    $("#gamepadPrompt").remove();    
+    // $("#gamepadPrompt").remove();    
     startGraphics();
 }
 
 const initGamepad = () => {
-    const prompt = "To begin using your gamepad, connect it and press any button!";
-    $("#gamepadPrompt").text(prompt);
+    // const prompt = "To begin using your gamepad, connect it and press any button!";
+    // $("#gamepadPrompt").text(prompt);
 
     const checkGP = window.setInterval(() => {
         if(navigator.getGamepads()[0]) {

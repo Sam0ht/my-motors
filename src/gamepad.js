@@ -11,7 +11,8 @@
 
 const pickupGamepad = () => {
     window.gamepad = navigator.getGamepads()[0]
-    $("#gamepadPrompt").text("Got gamepad with " + window.gamepad.axes.length + " axes");    
+    // $("#gamepadPrompt").text("Got gamepad with " + window.gamepad.axes.length + " axes");    
+    $("#gamepadPrompt").remove();    
     startGraphics();
 }
 

@@ -152,18 +152,23 @@ class Car {
 
     constructor(mass, chassis, suspension, engine, initialPose) {
         this.pose = initialPose;
-        this.velocity = new THREE.Vector3(0, 0, 0);
+        this.velocity = this.pose.direction.clone().multiplyScalar(0.1); //new THREE.Vector3(0, 0, 0);
         this.mass = mass;
         this.weight = gravity.clone().multiplyScalar(this.mass.mass);
         this.lightness = 1 / this.mass.mass;
         this.chassisDimensions = chassis;
         this.suspension = suspension;
         this.engine = engine;
+        this.maxSteeringLockRadians = chassis.steeringLock * Math.PI / 180;
+        this.frontWheelbase = chassis.wheelbase / 200;
+        this.rearWheelbase = chassis.wheelbase / 200;  // cm > M, half because CG in centre of car
         
-        this.cameraHeight = 2;
-        this.cameraBehind = 10;
+        this.cameraHeight = 1;
+        this.cameraBehind = 0;
+        this.yawRate = 0;
 
         this.tyreGrip = 1;  // 1G grip
+        this.tyreSharpness = 1000;  // N / radian / m/s  (?)
     };
 
     getCameraPose() {
@@ -196,6 +201,7 @@ class Car {
         return totalForce;                    
     }
 
+
     tractionForce(throttleInput, wheelLoading) {
         const appliedTorque = throttleInput * this.engine.maxTorque;
         const availableTraction = wheelLoading.y * this.tyreGrip;  // TODO: use of wheelLoading.y for vertical load?
@@ -209,6 +215,24 @@ class Car {
         const availableTraction = wheelLoading.y * this.tyreGrip;  // TODO: use of wheelLoading.y for vertical load?
         const brakeForce = Math.min(appliedTorque, availableTraction);
         return this.pose.direction.clone().multiplyScalar(-brakeForce);     
+    }
+
+    rightVector() {
+        return this.pose.direction.clone().cross(this.pose.up);
+    }
+    
+    lateralForce(slipAngle, speed, wheelLoading) {        
+        const slipForce = slipAngle * speed * this.tyreSharpness;
+        const availableTraction = wheelLoading.y * this.tyreGrip;  // TODO: use of wheelLoading.y for vertical load?
+        const lateralForce = Math.min(slipForce, availableTraction);
+        return this.rightVector().multiplyScalar(-lateralForce);     
+    }
+
+    angleFrom(v1, v2) {
+        const angle = v1.angleTo(v2);
+        const cross = v1.clone().cross(v2);
+        const polarity = Math.sign(this.pose.up.clone().dot(cross));
+        return angle * polarity;  // angleTo is absolute, doesn't include direction (sigh)
     }
 
     update(frameInterval) {
@@ -232,6 +256,7 @@ class Car {
         const throttleInput = gamepad.buttons[7].value;
         
         const tractionForce = this.tractionForce(throttleInput, rearWheelLoading);
+        
         // console.log("Throttle input", throttleInput, "Tractive force", tractionForce);
         force.add(tractionForce);
 
@@ -241,6 +266,45 @@ class Car {
         force.add(brakingForceFront);
         const brakingForceRear = this.brakingForce(brakeInput, rearWheelLoading);
         force.add(brakingForceRear);
+
+        // lateral forces
+        if (this.velocity.length() > 0) {
+            const spinVelocityFront = -this.frontWheelbase * this.yawRate;
+            const frontWheelVelocity = this.velocity.clone().add(this.rightVector().multiplyScalar(spinVelocityFront));
+
+            // let slipAngleFront = frontWheelVelocity.angleTo(this.pose.direction);
+            // const cross = frontWheelVelocity.clone().cross(this.pose.direction);
+            // const polarity = Math.sign(this.pose.up.clone().dot(cross));
+            // slipAngleFront *= polarity;  // angleTo is absolute, doesn't include direction (sigh)
+            const slipAngleFront = this.angleFrom(frontWheelVelocity, this.pose.direction);
+            
+            // rear wheels
+            const spinVelocityRear = this.rearWheelbase * this.yawRate;
+            const rearWheelVelocity = this.velocity.clone().add(this.rightVector().multiplyScalar(spinVelocityRear));
+            const slipAngleRear = this.angleFrom(rearWheelVelocity, this.pose.direction);
+
+            const lateralForceRear = this.lateralForce(slipAngleRear, rearWheelVelocity.length(), rearWheelLoading);
+            force.add(lateralForceRear)
+            // console.log("slip angles", slipAngleFront, slipAngleRear, "rear lat force", lateralForceRear);
+
+            // front wheels
+            const steeringInput = gamepad.axes[2] ** 3;
+            const steeringAngle = -(steeringInput) * this.maxSteeringLockRadians;  // cube to make -1..1 range input softer around centre
+            const lateralForceFront = this.lateralForce(slipAngleFront + steeringAngle, frontWheelVelocity.length(), frontWheelLoading);
+            force.add(lateralForceFront);
+
+            // console.log("input", steeringInput, "angle", steeringAngle, "lat force front", lateralForceFront);
+            
+            // Yaw Torque
+            const right = this.rightVector();
+            const yawTorque = (lateralForceRear.dot(right) * this.rearWheelbase * 1.1) - lateralForceFront.dot(right) * this.frontWheelbase;          // 1.1 for stability
+            this.yawRate += (time * 0.2 * yawTorque / this.mass.inertia);  // 0.2 to slow down rotation wrt lateral grip
+            const yaw = this.yawRate * time;
+            this.pose.direction.applyAxisAngle(this.pose.up, yaw);
+            // console.log("yaw torque", yawTorque, "yaw rate", this.yawRate, "yaw", yaw, "direction", this.pose.direction);
+        } else {
+            console.log("start driving to develop lateral forces", this.velocity)
+        }
 
         const acceleration = force.multiplyScalar(this.lightness);
 
@@ -254,10 +318,12 @@ class Car {
 
 const car = new Car({  // RX-7
     mass: 1250,
-    cgPosition: [0, 20, 0]  //cm
+    cgPosition: [0, 20, 0],  //cm
+    inertia: 2000  // Kg m2
 }, {
     wheelbase: 280,   //cm
-    track: 160
+    track: 160,
+    steeringLock: 45  // degrees
 }, {
     wheelRates: [3500, 3500],   //??
     totalTravel: [20, 20],  // cm

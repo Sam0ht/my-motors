@@ -48,6 +48,8 @@ const geometryGrass2 = createGeometry(lanePointsGrass2);
 const grassObject2 = createMesh(geometryGrass2, 'assets/grass.jpg');
 scene.add( grassObject2 );
 
+const meshes = [ trackObject, grassObject, grassObject2 ];
+
 
 function makeLane(lane, spline) {
     const leftOffset = -(lane.width * 0.5) + lane.offset;
@@ -106,8 +108,9 @@ function createTrackSpline(up) {
         const poses = [];
         for (i = 0; i < length; i++) {
             poses.push(pose);
+            const rise = (i > 100 && i < 110) ? 0.1 : 0;            
             pose = {
-                position: pose.position.clone().add(pose.direction.clone().multiplyScalar(sl)),
+                position: pose.position.clone().add(pose.direction.clone().multiplyScalar(sl).add(up.clone().multiplyScalar(rise))),
                 direction: pose.direction
             };
         }
@@ -137,7 +140,7 @@ function createTrackSpline(up) {
         curve(72, 135)
     ]; // TODO: make it join up
     const spline = [{
-        position: new THREE.Vector3(0, 0, 0),
+        position: new THREE.Vector3(0, 1, 0),
         direction: new THREE.Vector3(1, 0, 0)
     }];
     track.forEach(segment => {
@@ -147,6 +150,24 @@ function createTrackSpline(up) {
 }
 
 const speedUp = 1;
+
+class Wheel {
+    constructor(car, index, longOffset, latOffset) {
+        this.parent = car;
+        this.index = index;        
+        this.longOffset = longOffset;
+        this.latOffset = latOffset;
+    }
+
+    getRay() {
+        const longOffset = this.parent.pose.direction.clone().multiplyScalar(this.longOffset);
+        const latOffset = this.parent.rightVector().multiplyScalar(this.latOffset);
+
+        const origin = this.parent.pose.position.clone().add(longOffset).add(latOffset);
+        const direction = this.parent.pose.up.clone().multiplyScalar(-1);
+        return new THREE.Raycaster(origin, direction);
+    }
+}
 
 class Car {
 
@@ -169,6 +190,13 @@ class Car {
 
         this.tyreGrip = 1;  // 1G grip
         this.tyreSharpness = 2000;  // N / radian / m/s  (?)
+
+        const offsets = [this.frontWheelbase, -this.rearWheelbase];
+        this.wheels = [];
+        for (let i = 0; i < 4; i++) {
+            this.wheels.push(new Wheel(this, i, offsets[Math.floor(i/2)], chassis.track / 200 * (i % 2 == 0 ? -1 : 1)))
+        }
+        console.log(this.wheels);
     };
 
     getCameraPose() {
@@ -179,28 +207,33 @@ class Car {
     };
 
     damperForce(wheelIndex) {
-        const totalTravel = this.suspension.totalTravel[wheelIndex] * 0.01;  // cm -> m
-        const displacement = totalTravel - this.pose.position.y;  //TODO: redundant with spring calc
-        if (displacement < 0) {
-            return new THREE.Vector3(0, 0, 0);
-        }
         const verticalWheelRate = this.velocity.y;  //TODO: big simplification
         const damperForce = this.suspension.damperRates[wheelIndex] * verticalWheelRate * -2;
         return this.pose.up.clone().multiplyScalar(damperForce);
     }
 
-    springForce(springIndex) {
+    heightAboveGround(springIndex, meshes) {
+        const wheelIndex = springIndex * 2;
+        const wheels = this.wheels.slice(wheelIndex, wheelIndex + 1);
+        const rays = wheels.map(wheel => wheel.getRay());
+        const intersections = rays.map(ray => meshes.map(mesh => ray.intersectObject(mesh))).flat(99);
+        const distances = intersections.map(i => i.distance);
+        return distances.reduce( ( a, b ) => a + b, 0 ) / distances.length;
+    }
+
+    springForce(springIndex, meshes) {
         const totalTravel = this.suspension.totalTravel[springIndex] * 0.01;  // cm -> m
-        const displacement = totalTravel - this.pose.position.y;  // TODO: consider wheel position based on orientation, intersect ground plane
-        if (displacement < 0) {
-            return new THREE.Vector3(0, 0, 0);
+        const h = this.heightAboveGround(springIndex, meshes);
+        const displacement = totalTravel - h;  // TODO: consider wheel position based on orientation, intersect ground plane
+        // console.log("displacement, position, altitude", displacement, h, this.pose.position.y);
+        if (displacement < 0) {            
+            return [ new THREE.Vector3(0, 0, 0), displacement ];
         }
         const springRate = this.suspension.wheelRates[springIndex] * 10;  // kg/cm -> N/m
         const totalVerticalForce = displacement * springRate * 2;  // two front wheels
         const totalForce = this.pose.up.clone().multiplyScalar(totalVerticalForce);
-        return totalForce;                    
+        return [ totalForce, displacement ];                    
     }
-
 
     tractionForce(throttleInput, wheelLoading) {
         const appliedTorque = throttleInput * this.engine.maxTorque;
@@ -241,22 +274,30 @@ class Car {
         return positiveInput * Math.sign(steeringInput);
     }
 
-    update(frameInterval) {
+    update(frameInterval, meshes) {
         const time = frameInterval * 0.001 * speedUp;
         const force = new THREE.Vector3(0, 0, 0);
         force.add(this.weight);
         
         //front
-        const frontSpringForce = this.springForce(0);
-        const frontDampingForce = this.damperForce(0);
-        const frontWheelLoading = frontSpringForce.clone().add(frontDampingForce);
-        force.add(frontWheelLoading);
+        const [frontSpringForce, frontDisplacement] = this.springForce(0, meshes);
+        let frontWheelLoading = new THREE.Vector3(0,0,0);
+        if (frontDisplacement > 0) {
+            const frontDampingForce = this.damperForce(0);
+            frontWheelLoading = frontSpringForce.clone().add(frontDampingForce);
+            force.add(frontWheelLoading);
+            // console.log("front wheel loading", frontWheelLoading)
+        }
 
         //rear        
-        const rearSpringForce = this.springForce(1);        
-        const rearDamperForce = this.damperForce(1);
-        const rearWheelLoading = rearSpringForce.clone().add(rearDamperForce);
-        force.add(rearWheelLoading);
+        const [rearSpringForce, rearDisplacement] = this.springForce(1, meshes);   
+        let rearWheelLoading = new THREE.Vector3(0,0,0);
+        if (rearDisplacement > 0)      {
+            const rearDamperForce = this.damperForce(1);
+            rearWheelLoading = rearSpringForce.clone().add(rearDamperForce);
+            force.add(rearWheelLoading);
+            // console.log("rear wheel loading", rearWheelLoading)
+        }
 
         const gamepad = navigator.getGamepads()[0];
         const throttleInput = gamepad.buttons[7].value;
@@ -274,43 +315,36 @@ class Car {
         force.add(brakingForceRear);
 
         // lateral forces
-        // if (this.velocity.length() > 0) {
-            const spinVelocityFront = -this.frontWheelbase * this.yawRate;
-            const frontWheelVelocity = this.velocity.clone().add(this.rightVector().multiplyScalar(spinVelocityFront));
+        const spinVelocityFront = -this.frontWheelbase * this.yawRate;
+        const frontWheelVelocity = this.velocity.clone().add(this.rightVector().multiplyScalar(spinVelocityFront));
 
-            // let slipAngleFront = frontWheelVelocity.angleTo(this.pose.direction);
-            // const cross = frontWheelVelocity.clone().cross(this.pose.direction);
-            // const polarity = Math.sign(this.pose.up.clone().dot(cross));
-            // slipAngleFront *= polarity;  // angleTo is absolute, doesn't include direction (sigh)
-            const slipAngleFront = this.angleFrom(frontWheelVelocity, this.pose.direction);
-            
-            // rear wheels
-            const spinVelocityRear = this.rearWheelbase * this.yawRate;
-            const rearWheelVelocity = this.velocity.clone().add(this.rightVector().multiplyScalar(spinVelocityRear));
-            const slipAngleRear = this.angleFrom(rearWheelVelocity, this.pose.direction);
+        const slipAngleFront = this.angleFrom(frontWheelVelocity, this.pose.direction);
+        
+        // rear wheels
+        const spinVelocityRear = this.rearWheelbase * this.yawRate;
+        const rearWheelVelocity = this.velocity.clone().add(this.rightVector().multiplyScalar(spinVelocityRear));
+        const slipAngleRear = this.angleFrom(rearWheelVelocity, this.pose.direction);
 
-            const [lateralForceRear, slideRear] = this.lateralForce(slipAngleRear, rearWheelVelocity.length(), rearWheelLoading);
-            force.add(lateralForceRear)
-            // console.log("slip angles", slipAngleFront, slipAngleRear, "rear lat force", lateralForceRear);
+        const [lateralForceRear, slideRear] = this.lateralForce(slipAngleRear, rearWheelVelocity.length(), rearWheelLoading);
+        force.add(lateralForceRear)
+        // console.log("slip angles", slipAngleFront, slipAngleRear, "rear lat force", lateralForceRear);
 
-            // front wheels
-            const steeringInput = this.controlCurve(gamepad.axes[2]);
-            const steeringAngle = -(steeringInput) * this.maxSteeringLockRadians;  // cube to make -1..1 range input softer around centre
-            const [lateralForceFront, slideFront] = this.lateralForce(slipAngleFront + steeringAngle, frontWheelVelocity.length(), frontWheelLoading);
-            force.add(lateralForceFront);
+        // front wheels
+        const steeringInput = this.controlCurve(gamepad.axes[2]);
+        const steeringAngle = -(steeringInput) * this.maxSteeringLockRadians;  // cube to make -1..1 range input softer around centre
+        const [lateralForceFront, slideFront] = this.lateralForce(slipAngleFront + steeringAngle, frontWheelVelocity.length(), frontWheelLoading);
+        force.add(lateralForceFront);
 
-            // console.log("input", steeringInput, "angle", steeringAngle, "lat force front", lateralForceFront);
-            
-            // Yaw Torque
-            const right = this.rightVector();
-            const yawTorque = (lateralForceRear.dot(right) * this.rearWheelbase) - lateralForceFront.dot(right) * this.frontWheelbase;          // 1.1 for stability
-            this.yawRate += (time * 0.2 * yawTorque / this.mass.inertia);  // 0.2 to slow down rotation wrt lateral grip
-            const yaw = this.yawRate * time;
-            this.pose.direction.applyAxisAngle(this.pose.up, yaw);
-            // console.log("yaw torque", yawTorque, "yaw rate", this.yawRate, "yaw", yaw, "direction", this.pose.direction);
-        // } else {
-        //     console.log("start driving to develop lateral forces", this.velocity)
-        // }
+        // console.log("input", steeringInput, "angle", steeringAngle, "lat force front", lateralForceFront);
+        
+        // Yaw Torque
+        const right = this.rightVector();
+        const yawTorque = (lateralForceRear.dot(right) * this.rearWheelbase) - lateralForceFront.dot(right) * this.frontWheelbase;          // 1.1 for stability
+        this.yawRate += (time * 0.2 * yawTorque / this.mass.inertia);  // 0.2 to slow down rotation wrt lateral grip
+        const yaw = this.yawRate * time;
+        this.pose.direction.applyAxisAngle(this.pose.up, yaw);
+        // console.log("yaw torque", yawTorque, "yaw rate", this.yawRate, "yaw", yaw, "direction", this.pose.direction);
+
 
         const acceleration = force.multiplyScalar(this.lightness);
 
@@ -344,7 +378,7 @@ const car = new Car({  // RX-7
     maxTorque: 800,
     maxBrakeTorque: 1000
 }, {
-    position: new THREE.Vector3(10, 0.5, 0),  //m
+    position: new THREE.Vector3(10, 1, 0),  //m
     direction: new THREE.Vector3(1, 0, 0),
     up: up
 });
@@ -373,7 +407,7 @@ let frameCounter = 0;
 function animate() {
     setTimeout( animate , frameInterval);
     frameCounter++;
-    car.update(frameInterval);
+    car.update(frameInterval, meshes);
     updateCamera();
 	renderer.render( scene, camera );
 }

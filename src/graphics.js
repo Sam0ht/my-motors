@@ -163,7 +163,7 @@ class Wheel {
         const longOffset = this.parent.pose.direction.clone().multiplyScalar(this.longOffset);
         const latOffset = this.parent.rightVector().multiplyScalar(this.latOffset);
 
-        const origin = this.parent.pose.position.clone().add(longOffset).add(latOffset);
+        const origin = this.parent.pose.position.clone().add(longOffset).add(latOffset).add(this.parent.pose.up);
         const direction = this.parent.pose.up.clone().multiplyScalar(-1);
         return new THREE.Raycaster(origin, direction);
     }
@@ -218,7 +218,7 @@ class Car {
         const rays = wheels.map(wheel => wheel.getRay());
         const intersections = rays.map(ray => meshes.map(mesh => ray.intersectObject(mesh))).flat(99);
         const distances = intersections.map(i => i.distance);
-        return distances.reduce( ( a, b ) => a + b, 0 ) / distances.length;
+        return (distances.reduce( ( a, b ) => a + b, 0 ) / distances.length) - 1;  // Ray starts from 1m above the 'wheel' position to avoid falling through
     }
 
     springForce(springIndex, meshes) {

@@ -222,10 +222,8 @@ class Car {
     }
 
     springForce(springIndex, meshes) {
-        const totalTravel = this.suspension.totalTravel[springIndex] * 0.01;  // cm -> m
-        const h = this.heightAboveGround(springIndex, meshes);
-        const displacement = totalTravel - h;  // TODO: consider wheel position based on orientation, intersect ground plane
-        // console.log("displacement, position, altitude", displacement, h, this.pose.position.y);
+        const totalTravel = this.suspension.totalTravel[springIndex] * 0.01;  // cm -> m        
+        const displacement = totalTravel - this.heightAboveGround(springIndex, meshes);        
         if (displacement < 0) {            
             return [ new THREE.Vector3(0, 0, 0), displacement ];
         }

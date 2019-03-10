@@ -160,14 +160,15 @@ const car = new Car({  // RX-7
     track: 160,
     steeringLock: 45  // degrees
 }, {
-    wheelRates: [3500, 3500],   //??
-    totalTravel: [20, 20],  // cm
-    damperRates: [2000, 2000]  //??
+    // FL, FR, RL, RR
+    wheelRates: [3500, 3500, 3500, 3500],   //??
+    totalTravel: [20, 20, 20, 20],  // cm
+    damperRates: [2000, 2000, 2000, 2000]  //??
 }, {
     maxTorque: 800,
     maxBrakeTorque: 1000
 }, {
-    position: new THREE.Vector3(10, 1, 0),  //m
+    position: new THREE.Vector3(10, 2, 0),  //m
     direction: new THREE.Vector3(1, 0, 0),
     up: up
 });

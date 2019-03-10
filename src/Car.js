@@ -46,6 +46,8 @@ class Car {
         return positiveInput * Math.sign(steeringInput);
     }
     update(frameInterval, meshes) {
+        gamepad = navigator.getGamepads()[0]
+
         const time = frameInterval * 0.001 * speedUp;
 
         const force = new THREE.Vector3(0, 0, 0);
@@ -62,8 +64,6 @@ class Car {
         const accelTorque = throttleInput * this.engine.maxTorque;
 
         const wheelForcesRear = this.wheels.slice(2, 4).map(wheel => wheel.getForce(meshes, 0, accelTorque - brakeTorque));
-
-        // console.log("Forces", wheelForcesFront, wheelForcesRear, "Torques", accelTorque, brakeTorque, "Inputs", throttleInput, brakeInput);
 
         const frontForce = wheelForcesFront.reduce((a, b) => a.add(b));
         const rearForce = wheelForcesRear.reduce((a, b) => a.add(b));

@@ -149,12 +149,14 @@ function createTrackSpline(up) {
     return spline;
 }
 
-const speedUp = 1;
+// const speedUp = 1;
 
 const car = new Car({  // RX-7
     mass: 1250,
     cgPosition: [0, 20, 0],  //cm
-    inertia: 2000  // Kg m2
+    yawInertia: 2000,  // Kg m2
+    rollInertia: 400,
+    pitchInertia: 1500
 }, {
     wheelbase: 280,   //cm
     track: 160,

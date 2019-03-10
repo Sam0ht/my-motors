@@ -34,7 +34,7 @@ class Wheel {
         const polarity = Math.sign(this.up().dot(cross));
         return angle * polarity; // angleTo is absolute, doesn't include direction (sigh)
     }
-    getForce = (meshes, steeringAngle, netAppliedTorque) => {
+    getForce = (meshes, steeringAngle, netAppliedTorque, time) => {
         const force = new THREE.Vector3(0, 0, 0);
         const displacement = this.travel - this.heightAboveGround(meshes);        
         // console.log("d", displacement)
@@ -45,11 +45,16 @@ class Wheel {
         const steerDirection = this.direction().applyAxisAngle(this.up(), steeringAngle);
 
         // spring + damper
-        const springForce = displacement * this.springRate;
-        const verticalWheelRate = this.parent.velocity.y; //TODO: big simplification        
-        const damperForce = this.damperRate * -verticalWheelRate;
-        const verticalForce = springForce + damperForce;
+        let verticalForce = displacement * this.springRate;
+        if (this.lastDisplacement) {
+            const verticalWheelRate = (displacement - this.lastDisplacement) / time;
+            const damperForce = this.damperRate * verticalWheelRate;
+            verticalForce += damperForce;
+        } 
         force.add(this.up().multiplyScalar(verticalForce));
+        this.lastDisplacement = displacement;
+        
+
         // console.log("displacement", displacement, "springForce", springForce)
 
         // brake and acceleration

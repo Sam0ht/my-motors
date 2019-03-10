@@ -11,11 +11,13 @@ class Car {
         this.maxSteeringLockRadians = chassis.steeringLock * Math.PI / 180;
         this.frontWheelbase = chassis.wheelbase / 200;
         this.rearWheelbase = chassis.wheelbase / 200; // cm > M, half because CG in centre of car
+        this.track = chassis.wheelbase / 100;  // cm > N
         this.cameraHeight = 1;
         this.cameraBehind = 0;
         this.yawRate = 0;
+        this.rollRate = 0;
         this.tyreGrip = 1; // 1G grip
-        this.tyreSharpness = 2000; // N / radian / m/s  (?)
+        this.tyreSharpness = 1000; // N / radian / m/s  (?)
         const offsets = [this.frontWheelbase, -this.rearWheelbase];
         this.wheels = [];
         for (let i = 0; i < 4; i++) {
@@ -48,7 +50,7 @@ class Car {
     update(frameInterval, meshes) {
         gamepad = navigator.getGamepads()[0]
 
-        const time = frameInterval * 0.001 * speedUp;
+        const time = frameInterval * 0.001;
 
         const force = new THREE.Vector3(0, 0, 0);
         force.add(this.weight);
@@ -58,24 +60,36 @@ class Car {
         const brakeInput = gamepad.buttons[6].value;
         const brakeTorque = brakeInput * this.engine.maxBrakeTorque;
 
-        const wheelForcesFront = this.wheels.slice(0, 2).map(wheel => wheel.getForce(meshes, steeringAngle, -brakeTorque));
+        const wheelForcesFront = this.wheels.slice(0, 2).map(wheel => wheel.getForce(meshes, steeringAngle, -brakeTorque, time));
         
         const throttleInput = gamepad.buttons[7].value;
         const accelTorque = throttleInput * this.engine.maxTorque;
 
-        const wheelForcesRear = this.wheels.slice(2, 4).map(wheel => wheel.getForce(meshes, 0, accelTorque - brakeTorque));
+        const wheelForcesRear = this.wheels.slice(2, 4).map(wheel => wheel.getForce(meshes, 0, accelTorque - brakeTorque, time));
 
-        const frontForce = wheelForcesFront.reduce((a, b) => a.add(b));
-        const rearForce = wheelForcesRear.reduce((a, b) => a.add(b));
+        const frontForce = wheelForcesFront.reduce((a, b) => a.clone().add(b));
+        const rearForce = wheelForcesRear.reduce((a, b) => a.clone().add(b));
 
         force.add(frontForce);
         force.add(rearForce);
 
+        // Yaw - neglecting longitudinal forces
         const right = this.rightVector();
         const yawTorque = (rearForce.dot(right) * this.rearWheelbase) - frontForce.dot(right) * this.frontWheelbase;
-        this.yawRate += (time * 0.2 * yawTorque / this.mass.inertia); // 0.2 to slow down rotation wrt lateral grip
-        const yaw = this.yawRate * time;
-        this.pose.direction.applyAxisAngle(this.pose.up, yaw);
+        this.yawRate += (time * 0.2 * yawTorque / this.mass.yawInertia); // 0.2 to slow down rotation wrt lateral grip
+        const yawDelta = this.yawRate * time;
+        this.pose.direction.applyAxisAngle(this.pose.up, yawDelta);
+
+        // Roll
+        const leftForce = wheelForcesFront[0].clone().add(wheelForcesRear[0]);
+        const rightForce = wheelForcesFront[1].clone().add(wheelForcesRear[1]);
+        const rollTorque = leftForce.dot(this.pose.up) * (this.track / 2) -
+                            rightForce.dot(this.pose.up) * (this.track / 2);
+        this.rollRate += (time * rollTorque / this.mass.rollInertia)
+        const rollDelta = this.rollRate * time;
+        this.pose.up.applyAxisAngle(this.pose.direction, rollDelta);
+
+        
         
         const acceleration = force.multiplyScalar(this.lightness);
         const dv = acceleration.multiplyScalar(time);

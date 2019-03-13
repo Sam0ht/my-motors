@@ -43,7 +43,7 @@ class Wheel {
         
         //TODO duplication
         if (maybeIntersection.length === 0 || (maybeIntersection[0].distance - 1) > this.travel) {
-            return force;  // wheel is not touching the ground so applies no forces
+            return { force };  // wheel is not touching the ground so applies no forces
         }
         const {distance: d, face} =  maybeIntersection[0];
         const height = d - 1;
@@ -88,6 +88,6 @@ class Wheel {
         force.add(right.clone().multiplyScalar(-lateralForce));
         const wheelIsSlipping = slipForce > availableTraction;
 
-        return force; 
+        return { force, up, wheelIsSlipping, height }; 
     }
 }

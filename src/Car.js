@@ -110,8 +110,8 @@ class Car {
         
       
         
-        const acceleration = force.multiplyScalar(this.lightness);
-        const dv = acceleration.multiplyScalar(time);
+        const acceleration = force.clone().multiplyScalar(this.lightness);
+        const dv = acceleration.clone().multiplyScalar(time);
         this.velocity = this.velocity.clone().add(dv);
         this.pose.position.add(this.velocity.clone().multiplyScalar(time));
 

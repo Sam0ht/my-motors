@@ -67,6 +67,7 @@ function createMesh(geometry, textureFileName) {
     texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
     texture.repeat.set(3, 1);
     const material = new THREE.MeshBasicMaterial({ color: 0xaaaaaa, map: texture });
+    geometry.computeFaceNormals;
     return new THREE.Mesh(geometry, material);    
 }
 

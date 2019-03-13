@@ -175,8 +175,12 @@ const car = new Car({  // RX-7
     up: up
 });
 
+
+let messageElement;
+
 function startGraphics() {
-    document.body.appendChild( renderer.domElement );
+    document.body.appendChild( renderer.domElement );    
+    messageElement = $("#messages");
     animate();
 }
 
@@ -190,6 +194,7 @@ function updateCamera() {
     camera.position.x = newPosition.x
     camera.position.y = newPosition.y
     camera.position.z = newPosition.z
+    camera.up = cameraPose.up
     camera.lookAt(newPosition.clone().add(cameraPose.direction))
     camera.updateMatrixWorld();
 }
@@ -199,7 +204,14 @@ let frameCounter = 0;
 function animate() {
     setTimeout( animate , frameInterval);
     frameCounter++;
-    car.update(frameInterval, meshes);
+    const debugMessages = car.update(frameInterval, meshes);
+    const style = "width: 100px; display: inline-block";
+    messageElement.empty();
+    debugMessages.forEach(mess => {
+        messageElement.append('<span style="' + style  + '">' + mess + '</span>');
+    });
+
+    // console.log(debug);
     updateCamera();
 	renderer.render( scene, camera );
 }

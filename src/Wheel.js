@@ -42,16 +42,19 @@ class Wheel {
             return force;  // wheel is not touching the ground so applies no forces
         }
 
-        const steerDirection = this.direction().applyAxisAngle(this.up(), steeringAngle);
+        // const steerDirection = this.direction().applyAxisAngle(this.up(), steeringAngle);
 
         // spring + damper
         let verticalForce = displacement * this.springRate;
-        if (this.lastDisplacement) {
-            const verticalWheelRate = (displacement - this.lastDisplacement) / time;
+        if (this.lastDisplacement !== undefined && this.prevDisplacement !== undefined) {
+            
+            const oldDisplacement = (this.lastDisplacement + this.prevDisplacement) / 2
+            const verticalWheelRate = (displacement - oldDisplacement) / time;
             const damperForce = this.damperRate * verticalWheelRate;
             verticalForce += damperForce;
         } 
         force.add(this.up().multiplyScalar(verticalForce));
+        this.prevDisplacement = this.lastDisplacement;
         this.lastDisplacement = displacement;
         
 
@@ -61,13 +64,13 @@ class Wheel {
         const availableTraction = verticalForce * this.parent.tyreGrip;
         const longitudinalForce = Math.min(netAppliedTorque, availableTraction);
         // console.log("AT", availableTraction, "LongF", longitudinalForce)
-        force.add(steerDirection.clone().multiplyScalar(longitudinalForce));
+        force.add(this.direction().clone().multiplyScalar(longitudinalForce));
 
         // lateral
 
         const spinVelocity = -this.longOffset * this.parent.yawRate;
         const wheelVelocity = this.parent.velocity.clone().add(this.parent.rightVector().multiplyScalar(spinVelocity));
-        const slipAngle = this.angleFrom(wheelVelocity, steerDirection);
+        const slipAngle = this.angleFrom(wheelVelocity, this.direction()) + steeringAngle;
        
         const slipForce = slipAngle * wheelVelocity.length() * this.parent.tyreSharpness;
         const lateralForce = Math.min(slipForce, availableTraction);

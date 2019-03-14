@@ -183,7 +183,8 @@ let controller;
 function startGraphics() {
     document.body.appendChild( renderer.domElement );    
     messageElement = $("#messages");
-    controller = new Gamepad();
+    
+    controller = navigator.getGamepads()[0] ? new Gamepad() : new Keyboard();
     animate();
 }
 

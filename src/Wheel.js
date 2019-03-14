@@ -52,7 +52,7 @@ class Wheel {
         const direction = this.parent.pose.direction.clone().applyAxisAngle(up, steeringAngle);  // car heading plus any steering lock
         const right = direction.clone().cross(up); // should point along wheel 'axle'
 
-        console.log(up, direction, right);
+        // console.log(up, direction, right);
         
         const displacement = this.travel - height;        
 

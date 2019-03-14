@@ -178,10 +178,12 @@ const car = new Car({  // RX-7
 
 
 let messageElement;
+let controller;
 
 function startGraphics() {
     document.body.appendChild( renderer.domElement );    
     messageElement = $("#messages");
+    controller = new Gamepad();
     animate();
 }
 
@@ -205,7 +207,7 @@ let frameCounter = 0;
 function animate() {
     setTimeout( animate , frameInterval);
     frameCounter++;
-    const debugMessages = car.update(frameInterval, meshes);
+    const debugMessages = car.update(frameInterval, meshes, controller.getInputs());
     const style = "width: 100px; display: inline-block";
     messageElement.empty();
     debugMessages.forEach(mess => {

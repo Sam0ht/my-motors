@@ -33,7 +33,6 @@ class Car {
                 suspension.damperRates[i]));
         }
         console.log(this);
-        // console.log(this.wheels);
     }
     getCameraPose() {
         return {
@@ -50,23 +49,19 @@ class Car {
         const positiveInput = absIn * 0.5 + Math.max(0, absIn - 0.5);
         return positiveInput * Math.sign(steeringInput);
     }
-    update(frameInterval, meshes) {
-        gamepad = navigator.getGamepads()[0]
+    update(frameInterval, meshes, { steeringInput, throttleInput, brakeInput }) {
 
         const time = frameInterval * 0.001;
 
         const force = new THREE.Vector3(0, 0, 0);
         force.add(this.weight);
 
-        const steeringInput = this.controlCurve(gamepad.axes[2]);
         const steeringAngle = -(steeringInput) * this.maxSteeringLockRadians; 
-        const brakeInput = gamepad.buttons[6].value;
         const brakeTorque = brakeInput * this.engine.maxBrakeTorque;
 
         const frontWheels = this.wheels.slice(0, 2).map(wheel => wheel.getForce(meshes, steeringAngle, -brakeTorque, time));
         const wheelForcesFront = frontWheels.map(wheel => wheel.force);
         
-        const throttleInput = gamepad.buttons[7].value;
         const accelTorque = throttleInput * this.engine.maxTorque;
 
         const rearWheels = this.wheels.slice(2, 4).map(wheel => wheel.getForce(meshes, 0, accelTorque - brakeTorque, time));
@@ -102,7 +97,6 @@ class Car {
         const totalLateralForce = -totalForce.dot(right);
         const cgHeight = this.cgHeightInChassis + height;
         rollTorque += (totalLateralForce * cgHeight);
-        // console.log(totalForce, totalLateralForce)
 
         this.rollRate += (time * rollTorque * 0.2 / this.mass.rollInertia)
         const rollDelta = this.rollRate * time;

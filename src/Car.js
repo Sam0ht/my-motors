@@ -1,9 +1,9 @@
 class Car {
     constructor(mass, chassis, suspension, engine, initialPose) {
         this.pose = initialPose;
-        this.velocity = this.pose.direction.clone().multiplyScalar(0.1); //new THREE.Vector3(0, 0, 0);
+        this.velocity = scale(this.pose.direction, 0.1); //new THREE.Vector3(0, 0, 0);
         this.mass = mass;
-        this.weight = gravity.clone().multiplyScalar(this.mass.mass);
+        this.weight = scale(gravity, this.mass.mass);
         this.lightness = 1 / this.mass.mass;
         this.chassisDimensions = chassis;
         this.suspension = suspension;
@@ -36,13 +36,13 @@ class Car {
     }
     getCameraPose() {
         return {
-            position: this.pose.position.clone().sub(this.pose.direction.clone().multiplyScalar(this.cameraBehind)).add(this.pose.up.clone().multiplyScalar(this.cameraHeight)),
+            position: sum(this.pose.position, scale(this.pose.direction, -this.cameraBehind), scale(this.pose.up, this.cameraHeight)),
             direction: this.pose.direction,
             up: this.pose.up
         };
     } 
     rightVector() {
-        return this.pose.direction.clone().cross(this.pose.up);
+        return cross(this.pose.direction, this.pose.up);
     }  
     controlCurve(steeringInput) {
         const absIn = Math.abs(steeringInput);
@@ -69,7 +69,7 @@ class Car {
 
         const frontForce = wheelForcesFront.reduce((a, b) => a.clone().add(b));
         const rearForce = wheelForcesRear.reduce((a, b) => a.clone().add(b));
-        const totalForce = frontForce.clone().add(rearForce);
+        const totalForce = sum(frontForce, rearForce);
 
         force.add(totalForce);
 
@@ -79,22 +79,22 @@ class Car {
 
 
         // Yaw - neglecting longitudinal forces
-        const right =  this.pose.direction.clone().cross(groundUp);
-        const yawTorque = (rearForce.dot(right) * this.rearWheelbase) - frontForce.dot(right) * this.frontWheelbase;
+        const right = cross(this.pose.direction, groundUp);
+        const yawTorque = (dot(rearForce, right) * this.rearWheelbase) - dot(frontForce, right) * this.frontWheelbase;
         this.yawRate += (time * 0.2 * yawTorque / this.mass.yawInertia); // 0.2 to slow down rotation wrt lateral grip
         const yawDelta = this.yawRate * time;
         this.pose.direction.applyAxisAngle(groundUp, yawDelta);
 
         // Roll
-        const leftForce = wheelForcesFront[0].clone().add(wheelForcesRear[0]);
-        const rightForce = wheelForcesFront[1].clone().add(wheelForcesRear[1]);
-        let rollTorque = leftForce.dot(this.pose.up) * (this.track / 2) -
-                            rightForce.dot(this.pose.up) * (this.track / 2);
+        const leftForce = sum(wheelForcesFront[0], wheelForcesRear[0]);
+        const rightForce = sum(wheelForcesFront[1], wheelForcesRear[1]);
+        let rollTorque = dot(leftForce, this.pose.up) * (this.track / 2) -
+                            dot(rightForce, this.pose.up) * (this.track / 2);
 
 
         const heights = wheelStates.map(wheel => wheel.height !== undefined ? wheel.height : this.pose.position.y);
         const height = heights.reduce((a, b) => a + b) / heights.length;
-        const totalLateralForce = -totalForce.dot(right);
+        const totalLateralForce = -dot(totalForce, right);
         const cgHeight = this.cgHeightInChassis + height;
         rollTorque += (totalLateralForce * cgHeight);
 
@@ -103,8 +103,8 @@ class Car {
         this.pose.up.applyAxisAngle(this.pose.direction, rollDelta);
 
         // Pitch
-        let pitchTorque = frontForce.dot(this.pose.up) * (this.frontWheelbase) - rearForce.dot(this.pose.up) * this.rearWheelbase;
-        const totalLongitudinalForce = totalForce.dot(this.pose.direction);
+        let pitchTorque = dot(frontForce, this.pose.up) * (this.frontWheelbase) - dot(rearForce, this.pose.up) * this.rearWheelbase;
+        const totalLongitudinalForce = dot(totalForce, this.pose.direction);
         pitchTorque += (totalLongitudinalForce * cgHeight);
         
         this.pitchRate += (time * 0.2 * pitchTorque / this.mass.pitchInertia);
@@ -112,12 +112,11 @@ class Car {
         this.pose.direction.applyAxisAngle(right, pitchDelta);
         this.pose.up.applyAxisAngle(right, pitchDelta);
         
-      
         
-        const acceleration = force.clone().multiplyScalar(this.lightness);
-        const dv = acceleration.clone().multiplyScalar(time);
-        this.velocity = this.velocity.clone().add(dv);
-        this.pose.position.add(this.velocity.clone().multiplyScalar(time));
+        const acceleration = scale(force, this.lightness);
+        const dv = scale(acceleration, time);
+        this.velocity = sum(this.velocity, dv);
+        this.pose.position.add(scale(this.velocity, time));
 
         const displacements = this.wheels.map(wheel => wheel.lastDisplacement ? wheel.lastDisplacement.toFixed(3) : 0);
         return ["CGHeight", cgHeight.toFixed(2), "RollTorque", rollTorque.toFixed(3), "LatForce", totalLateralForce.toFixed(3), "displacements", displacements];

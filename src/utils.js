@@ -4,6 +4,8 @@ const scale = (vector, scalar) => vector.clone().multiplyScalar(scalar);
 
 const sum = (...vectors) => vectors.reduce((a, b) => a.clone().add(b));
 
+const minus = (vectorA, vectorB) => vectorA.clone().sub(vectorB);
+
 const cross = (vectorA, vectorB) => vectorA.clone().cross(vectorB);
 
 const dot = (vectorA, vectorB) => vectorA.clone().dot(vectorB);

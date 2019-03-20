@@ -18,12 +18,16 @@ const wrap = (index) => {
     return index;
 }
 
+const camberAmount = 3;
+
 spline = spline.map((pose, i) => {
     const prev = wrap(i - 1);
     const next = wrap(i + 1);
     const movement = spline[next].position.clone().sub(spline[prev].position).normalize();
-    const right = up.clone().cross(movement);
-    return {...pose, movement: movement, right: right};
+    const turn = camberAmount * cross(minus(pose.position, spline[prev].position), minus(spline[next].position, pose.position)).dot(up);
+    const camberUp = rotateByAround(up, -turn, movement);
+    const right = camberUp.clone().cross(movement);
+    return {...pose, movement, right, turn};
 });
 
 window.spline = spline;

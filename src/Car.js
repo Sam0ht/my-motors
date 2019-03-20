@@ -119,7 +119,10 @@ class Car {
         this.pose.position.add(scale(this.velocity, time));
 
         const displacements = this.wheels.map(wheel => wheel.lastDisplacement ? wheel.lastDisplacement.toFixed(3) : 0);
-        return ["CGHeight", cgHeight.toFixed(2), "RollTorque", rollTorque.toFixed(3), "LatForce", totalLateralForce.toFixed(3), "displacements", displacements];
+
+        const speed = this.velocity.length() * 2.23694;
+
+        return ["Speed mph", speed.toFixed(0), "LatForce", totalLateralForce.toFixed(3), "displacements", displacements];
     }
     
 }

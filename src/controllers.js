@@ -18,47 +18,44 @@ class Gamepad {
 
 class Keyboard {
 
+    LEFT = 37;
+    RIGHT = 39;
+    UP = 38;
+    DOWN = 40;
+
     constructor() {
         this.steeringInput = 0;
         this.throttleInput = 0;
         this.brakeInput = 0;
-        $(document).on("keydown", event => {
-            if (event.which === 37 && this.steeringInput > -1) {  //left
-                if (this.steeringInput > 0) {
-                    this.steeringInput = 0;
-                }
-                this.steeringInput -= 0.01;                
-            } else if (event.which === 39 && this.steeringInput < 1) { // right
-                if (this.steeringInput < 0) {
-                    this.steeringInput = 0;
-                }
-                this.steeringInput += 0.01;
-            } else if (event.which === 38 && this.throttleInput < 1) { // up 
-                this.throttleInput += 0.02;
-                this.brakeInput = 0;
-            } else if (event.which === 40 && this.brakeInput < 1) { //down
-                this.throttleInput = 0;
-                this.brakeInput += 0.02;
-            }
-        });
+        this.keyState = {};
+        $(document).on("keydown", event => this.keyState[event.which] = true);
+        $(document).on("keyup", event => this.keyState[event.which] = false);
+        
         window.setInterval(() => {
-            if (this.steeringInput > 0) {
-                this.steeringInput -= 0.001;
+        
+            if (this.keyState[this.LEFT]) {  //left
+                this.steeringInput = -1;                
+            } else if (this.keyState[this.RIGHT]) { // right
+                this.steeringInput = 1;
+            } else {
+                this.steeringInput = 0;
             }
-            if (this.steeringInput < 0) {
-                this.steeringInput += 0.001;
+
+            if (this.keyState[this.UP]) { // up 
+                this.throttleInput = 1;
+            } else {
+                this.throttleInput = 0;
             }
-            if (this.throttleInput > 0) {
-                this.throttleInput -= 0.001;
+
+            if (this.keyState[this.DOWN]) { //down
+                this.brakeInput = 1;
+            } else {
+                this.brakeInput = 0;
             }
-            if (this.brakeInput > 0) {
-                this.brakeInput -= 0.001;
-            }
-        }, 100);
+          
+        }, 50);
     }
 
-    getInputs = () => {
-        return this
-    }
-
+    getInputs = () => this
+    
 }

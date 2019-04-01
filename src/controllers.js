@@ -23,6 +23,8 @@ class Keyboard {
     UP = 38;
     DOWN = 40;
 
+    steerStep = 0.5;
+
     constructor() {
         this.steeringInput = 0;
         this.throttleInput = 0;
@@ -33,12 +35,12 @@ class Keyboard {
         
         window.setInterval(() => {
         
-            if (this.keyState[this.LEFT]) {  //left
-                this.steeringInput = -1;                
-            } else if (this.keyState[this.RIGHT]) { // right
-                this.steeringInput = 1;
+            if (this.keyState[this.LEFT] && this.steeringInput > -1) {  //left
+                this.steeringInput -= this.steerStep;                
+            } else if (this.keyState[this.RIGHT] && this.steeringInput < 1) { // right
+                this.steeringInput += this.steerStep;
             } else {
-                this.steeringInput = 0;
+                this.steeringInput -= this.steerStep * Math.sign(this.steeringInput);
             }
 
             if (this.keyState[this.UP]) { // up 

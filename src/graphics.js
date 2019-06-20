@@ -66,10 +66,31 @@ function makeLane(lane, spline) {
     return lanePoints;
 }
 
+const wallLeft = createGeometry(makeWall({height: 1.5, offset: 8, inverse: false}, spline));
+const wallLeftObject = createMesh(wallLeft, 'assets/brick_wall.jpg');
+scene.add(wallLeftObject);
+
+
+const wallRight = createGeometry(makeWall({height: 2.5, offset: -8, inverse: true}, spline));
+const wallRightObject = createMesh(wallRight, 'assets/brick_wall.jpg');
+scene.add(wallRightObject);
+
+
+
+function makeWall({height, offset, inverse}, spline) {
+    return spline.map(pose => {
+        const bottomVector = pose.right.clone().multiplyScalar(offset);
+        const topVector = bottomVector.clone().add(up.clone().multiplyScalar(height));
+        const bottomPoint = pose.position.clone().add(bottomVector);
+        const topPoint = pose.position.clone().add(topVector); 
+        return inverse ? [topPoint, bottomPoint] : [bottomPoint, topPoint];
+    });
+}
+
 function createMesh(geometry, textureFileName) {
     const texture = new THREE.TextureLoader().load(textureFileName);
     texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
-    texture.repeat.set(3, 1);
+    texture.repeat.set(1, 3);
     const material = new THREE.MeshBasicMaterial({ color: 0xaaaaaa, map: texture });
     geometry.computeFaceNormals;
     return new THREE.Mesh(geometry, material);    
